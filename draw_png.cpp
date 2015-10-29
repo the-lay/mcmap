@@ -877,11 +877,11 @@ namespace
 			memcpy(destination, source, BYTESPERPIXEL);
 			return;
 		}
-#		define BLEND(ca,aa,cb) uint8_t(((size_t(ca) * size_t(aa)) + (size_t(255 - aa) * size_t(cb))) / 255)
+#		define BLEND(ca,aa,cb) uint8_t(((size_t(ca) * size_t(aa)) + (size_t(255 - aa) * size_t(cb))) * 0.004)
 		destination[0] = BLEND(source[0], source[PALPHA], destination[0]);
 		destination[1] = BLEND(source[1], source[PALPHA], destination[1]);
 		destination[2] = BLEND(source[2], source[PALPHA], destination[2]);
-		destination[PALPHA] += (size_t(source[PALPHA]) * size_t(255 - destination[PALPHA])) / 255;
+		destination[PALPHA] += (size_t(source[PALPHA]) * size_t(255 - destination[PALPHA])) *0.004;
 	}
 
 	inline void modColor(uint8_t * const color, const int mod)
