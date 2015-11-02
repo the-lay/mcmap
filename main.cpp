@@ -31,11 +31,13 @@
 #include "colors.h"
 #include "worldloader.h"
 #include "globals.h"
+#include "timer.h"
 #include <string>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <chrono>
 #ifdef _DEBUG
 #include <cassert>
 #endif
@@ -68,6 +70,9 @@ void printHelp(char *binary);
 
 int main(int argc, char **argv)
 {
+	Timer timer, total_timer;
+	timer.start();
+	total_timer.start();
 	// ########## command line parsing ##########
 	if (argc < 2) {
 		printHelp(argv[0]);
@@ -267,7 +272,9 @@ int main(int argc, char **argv)
 		}
 		wholeworld = (g_FromChunkX == UNDEFINED || g_ToChunkX == UNDEFINED);
 	}
+	printf("+++Command line parsing, %ld ms\n", timer.print_ms());
 	// ########## end of command line parsing ##########
+	timer.reset();
 	if (g_Hell || g_ServerHell || end) g_UseBiomes = false;
 
 	printf("mcmap " VERSION " %dbit by Zahl\n", 8*sizeof(size_t));
@@ -540,7 +547,8 @@ int main(int argc, char **argv)
 			g_MapsizeX = (g_ToChunkZ - g_FromChunkZ) * CHUNKSIZE_Z;
 			g_MapsizeZ = (g_ToChunkX - g_FromChunkX) * CHUNKSIZE_X;
 		}
-
+		printf("+++Setting up world, %ld ms\n", timer.print_ms());
+		timer.reset();
 		// Load world or part of world
 		if (numSplitsX == 0 && wholeworld && !loadEntireTerrain()) {
 			printf("Error loading terrain from '%s'\n", filename);
@@ -571,14 +579,17 @@ int main(int argc, char **argv)
 		if (g_Underground) {
 			undergroundMode(false);
 		}
-
+		printf("+++Loading world, %ld ms\n", timer.print_ms());
+		timer.reset();
 		if (g_OffsetY == 2) {
 			optimizeTerrain2((numSplitsX == 0 ? cropLeft : 0), (numSplitsX == 0 ? cropRight : 0));
 		} else {
 			optimizeTerrain3();
 		}
+		printf("+++Optimize terrain, %ld ms\n", timer.print_ms());
 
 		// Finally, render terrain to file
+		timer.reset();
 		printf("Drawing map...\n");
 		for (size_t x = CHUNKSIZE_X; x < g_MapsizeX - CHUNKSIZE_X; ++x) {
 			printProgress(x - CHUNKSIZE_X, g_MapsizeX);
@@ -711,6 +722,8 @@ int main(int argc, char **argv)
 		}
 	}
 	// Drawing complete, now either just save the image or compose it if disk caching was used
+	printf("+++Drawing map, %ld ms\n", timer.print_ms());
+	timer.reset();
 	// Saving
 	if (!splitImage) {
 		saveImage();
@@ -722,8 +735,10 @@ int main(int argc, char **argv)
 	}
 	if (fileHandle != NULL) fclose(fileHandle);
 
+	printf("+++Saving map, %ld ms\n", timer.print_ms());
+	printf("+++Total time, %ld ms\n", total_timer.print_ms());
 	printf("Job complete.\n");
-	return 0;
+	system("pause");
 }
 
 #ifdef _DEBUG

@@ -128,6 +128,7 @@
     <ClInclude Include="helper.h" />
     <ClInclude Include="nbt.h" />
     <ClInclude Include="pngreader.h" />
+    <ClInclude Include="timer.h" />
     <ClInclude Include="worldloader.h" />
   </ItemGroup>
   <ItemGroup>
