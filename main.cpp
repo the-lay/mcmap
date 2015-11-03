@@ -761,32 +761,29 @@ void optimizeTerrain2(int cropLeft, int cropRight)
 		offsetZ = offsetGlobal;
 		for (int z = CHUNKSIZE_Z; z < maxZ; ++z) {
 			const uint8_t *block = &BLOCKAT(x, 0, z); // Get the lowest block at that point
-			int highest = 0, lowest = 0xFF; // remember lowest and highest block which are visible to limit the Y-for-loop later
+			int highest = 0, lowest = 0xFF; 
+			unsigned int ztemp = offsetZ % modZ;
+			// remember lowest and highest block which are visible to limit the Y-for-loop later
 			for (int y = 0; y < g_MapsizeY; ++y) { // Go up
-				uint8_t &current = blocked[((y+offsetY) % g_MapsizeY) + (offsetZ % modZ)];
-				if (current) { // Block is hidden, remove
-#ifdef _DEBUG
-					if (*block != AIR) {
-						++gBlocksRemoved;
+				unsigned int temp = (y + offsetY) % g_MapsizeY + ztemp;
+				if (blocked[temp]==0) { // bl ock is not hidden by another block
+					if (colors[*block][PALPHA] == 255) { // Block is not hidden, do not remove, but mark spot as blocked for next iteration
+						blocked[temp] = 1;
 					}
-#endif
-				} else { // block is not hidden by another block
 					if (*block != AIR && lowest == 0xFF) { // if it's not air, this is the lowest block to draw
 						lowest = y;
-					}
-					if (colors[*block][PALPHA] == 255) { // Block is not hidden, do not remove, but mark spot as blocked for next iteration
-						current = 1;
 					}
 					if (*block != AIR) highest = y; // if it's not air, it's the new highest block encountered so far
 				}
 				++block; // Go up
 			}
 			HEIGHTAT(x, z) = (((uint16_t)highest + 1) << 8) | (uint16_t)lowest; // cram them both into a 16bit int
-			blocked[(offsetY % g_MapsizeY) + (offsetZ % modZ)] = 0;
+			blocked[(offsetY % g_MapsizeY) + ztemp] = 0;
 			offsetZ += g_MapsizeY;
 		}
+		unsigned int oGtemp = offsetGlobal % modZ;
 		for (int y = 0; y < g_MapsizeY; ++y) {
-			blocked[y + (offsetGlobal % modZ)] = 0;
+			blocked[y + oGtemp] = 0;
 		}
 		offsetGlobal += g_MapsizeY;
 		++offsetY;
