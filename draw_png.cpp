@@ -873,42 +873,52 @@ namespace
 		#define PIXEL(x, y) (gImageBuffer[((x)+gOffsetX) * CHANSPERPIXEL + ((y)+gOffsetY) * gPngLocalLineWidthChans])
 		uint8_t *pos = &PIXEL(x, y);
 
+		// helper stuff
+		__m128i filled = _mm_set1_epi8(255);
+		__m128i fill_mask = _mm_set_epi8(0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0);
+		__m128i filled_zero = _mm_setzero_si128();
+		__m128i populate_alphas_mask1 = _mm_set_epi8(0xff, 0xff, 0x7, 0xff, 0x7, 0xff, 0x7, 0xff, 0xff, 0xff, 0x3, 0xff, 0x3, 0xff, 0x3, 0xff);
+		__m128i populate_alphas_mask2 = _mm_set_epi8(0xf, 0xf, 0xf, 0xf, 0xb, 0xb, 0xb, 0xb, 0x7, 0x7, 0x7, 0x7, 0x3, 0x3, 0x3, 0x3);
+
 		// load 4 destination pixels
 		__m128i dst = _mm_loadu_si128(reinterpret_cast<__m128i*>(pos)); // [r0 g0 b0 a0|r1 g1 b1 a1|r2 g2 b2 a2|r3 g3 b3 a3]
-		__m128i dst_0 = _mm_unpacklo_epi8(dst, _mm_setzero_si128()); // [r0 _ g0 _|b0 _ a0 _|r1 _ g1 _ |b1 _ a1 _]
-		__m128i dst_1 = _mm_unpackhi_epi8(dst, _mm_setzero_si128()); // [r2 _ g2 _|b2 _ a2 _|r3 _ g3 _ |b3 _ a3 _]
 
 		// load 4 src pixels
 		union { __m128i src; uint8_t src_8[16]; };
 		src = _mm_cvtsi32_si128(*reinterpret_cast<uint32_t*>(c));
 		__m128i src1 = _mm_cvtsi32_si128(*reinterpret_cast<uint32_t*>(c2));
-		src = _mm_shuffle_epi8(src, _mm_set_epi8(0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0)); // [r0 g0 b0 a0|r0 g0 b0 a0|r0 g0 b0 a0|r0 g0 b0 a0]
-		src1 = _mm_shuffle_epi8(src1, _mm_set_epi8(0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0, 0x3, 0x2, 0x1, 0x0)); // [r0 g0 b0 a0|r0 g0 b0 a0|r0 g0 b0 a0|r0 g0 b0 a0]
-		__m128i src_0 = _mm_unpacklo_epi8(src, _mm_setzero_si128()); // [r0 _ g0 _|b0 _ a0 _|r0 _ g0 _ |b0 _ a0 _]
-		__m128i src_1 = _mm_unpacklo_epi8(src1, _mm_setzero_si128()); // [r2 _ g2 _|b2 _ a2 _|r2 _ g2 _ |b2 _ a2 _]
-
-		// fill alphas
+		src = _mm_shuffle_epi8(src, fill_mask); // [r0 g0 b0 a0|r0 g0 b0 a0|r0 g0 b0 a0|r0 g0 b0 a0]
+		src1 = _mm_shuffle_epi8(src1, fill_mask); // [r0 g0 b0 a0|r0 g0 b0 a0|r0 g0 b0 a0|r0 g0 b0 a0]
+		
+		// load source alphas
 		__m128i srcA = _mm_set1_epi8(src_8[3]);
-		__m128i srcA_inv = _mm_set1_epi8(256 - src_8[3]);
-		__m128i srcA_0 = _mm_shuffle_epi8(srcA, _mm_set_epi8(0xff, 0xff, 0x7, 0xff, 0x7, 0xff, 0x7, 0xff, 0xff, 0xff, 0x3, 0xff, 0x3, 0xff, 0x3, 0xff));
-		__m128i srcA_inv_0 = _mm_shuffle_epi8(srcA_inv, _mm_set_epi8(0xff, 0xff, 0x7, 0xff, 0x7, 0xff, 0x7, 0xff, 0xff, 0xff, 0x3, 0xff, 0x3, 0xff, 0x3, 0xff));
+		__m128i srcA_inv = _mm_subs_epu8(filled, srcA);
+		
+		__m128i src_0 = _mm_unpacklo_epi8(src, filled_zero); // [r0 _ g0 _|b0 _ a0 _|r0 _ g0 _ |b0 _ a0 _]
+		__m128i src_1 = _mm_unpacklo_epi8(src1, filled_zero); // [r2 _ g2 _|b2 _ a2 _|r2 _ g2 _ |b2 _ a2 _]
 
-		__m128i xmm0_0 = _mm_mulhi_epu16(src_0, srcA_0); //((size_t(ca) * size_t(aa))
-		__m128i xmm0_1 = _mm_mulhi_epu16(src_1, srcA_0);
+		// process source alphas
+		__m128i srcA_0 = _mm_shuffle_epi8(srcA, populate_alphas_mask1);
+		__m128i srcA_inv_0 = _mm_shuffle_epi8(srcA_inv, populate_alphas_mask1);
+		__m128i dstA = _mm_shuffle_epi8(dst, populate_alphas_mask2);
 
-		__m128i xmm1_0 = _mm_mulhi_epu16(dst_0, srcA_inv_0); //(size_t(255 - aa) * size_t(cb))
-		__m128i xmm1_1 = _mm_mulhi_epu16(dst_0, srcA_inv_0);
+		src_0 = _mm_mulhi_epu16(src_0, srcA_0); //((size_t(ca) * size_t(aa))
+		src_1 = _mm_mulhi_epu16(src_1, srcA_0);
 
-		__m128i xmm2_0 = _mm_adds_epu16(xmm0_0, xmm1_0); // +
-		__m128i xmm2_1 = _mm_adds_epu16(xmm0_1, xmm1_1);
+		// _mm_unpacklo_epi8(dst, _mm_setzero_si128()) == [r0 _ g0 _|b0 _ a0 _|r1 _ g1 _ |b1 _ a1 _]
+		// _mm_unpackhi_epi8(dst, _mm_setzero_si128()) == [r2 _ g2 _|b2 _ a2 _|r3 _ g3 _ |b3 _ a3 _]
+		__m128i xmm1_0 = _mm_mulhi_epu16(_mm_unpacklo_epi8(dst, _mm_setzero_si128()), srcA_inv_0); //(size_t(255 - aa) * size_t(cb))
+		__m128i xmm1_1 = _mm_mulhi_epu16(_mm_unpackhi_epi8(dst, _mm_setzero_si128()), srcA_inv_0);
+
+		__m128i xmm2_0 = _mm_adds_epu16(src_0, xmm1_0);
+		__m128i xmm2_1 = _mm_adds_epu16(src_1, xmm1_1);
 
 		__m128i xmm3 = _mm_packus_epi16(xmm2_0, xmm2_1);
 
 		// compute result alpha
-		__m128i dstA = _mm_shuffle_epi8(dst, _mm_set_epi8(15, 15, 15, 15, 11, 11, 11, 11, 7, 7, 7, 7, 3, 3, 3, 3));
 		__m128i dstA_inv = _mm_subs_epu8(_mm_set1_epi8(255), dstA);
 
-		__m128i dstA_inv_0 = _mm_shuffle_epi8(dstA_inv, _mm_set_epi8(0xff, 0xff, 0xff, 0x15, 0xff, 0xff, 0xff, 0x11, 0xff, 0xff, 0xff, 0x7, 0xff, 0xff, 0xff, 0x0));
+		__m128i dstA_inv_0 = _mm_shuffle_epi8(dstA_inv, _mm_set_epi8(0xff, 0xff, 0xff, 0x15, 0xff, 0xff, 0xff, 0x11, 0xff, 0xff, 0xff, 0x7, 0xff, 0xff, 0xff, 0x3));
 		// dst[a0 _ _ _|a1 _ _ _|a2 _ _ _|a3 _ _ _]
 		
 		__m128i srcA_1 = _mm_shuffle_epi8(srcA, _mm_set_epi8(0xff, 0xff, 0x15, 0xff, 0xff, 0xff, 0x11, 0xff, 0xff, 0xff, 0x7, 0xff, 0xff, 0xff, 0x3, 0xff));
@@ -919,7 +929,7 @@ namespace
 
 		__m128i res3 = _mm_shuffle_epi8(res, _mm_set_epi8(0x6, 0xff, 0xff, 0xff, 0x4, 0xff, 0xff, 0xff, 0x2, 0xff, 0xff, 0xff, 0x0, 0xff, 0xff, 0xff)); // res[_ _ _ a0|_ _ _ a1|_ _ _ a2|_ _ _ a3]
 
-		__m128i dstA_isolated = _mm_shuffle_epi8(dstA, _mm_set_epi8(15, 0xff, 0xff, 0xff, 11, 0xff, 0xff, 0xff, 7, 0xff, 0xff, 0xff, 3, 0xff, 0xff, 0xff));
+		__m128i dstA_isolated = _mm_shuffle_epi8(dstA, _mm_set_epi8(0xf, 0xff, 0xff, 0xff, 0xb, 0xff, 0xff, 0xff, 0x7, 0xff, 0xff, 0xff, 0x3, 0xff, 0xff, 0xff));
 
 		__m128i res4 = _mm_adds_epu8(res3, dstA_isolated);
 
