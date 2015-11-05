@@ -58,6 +58,8 @@ namespace
 		       + (uint32_t(val[3]));
 	}
 
+	bool firstIf[197] = { false };
+
 }
 
 static bool loadChunk(const char *streamOrFile, const size_t len = 0);
@@ -186,6 +188,51 @@ bool scanWorldDirectory(const char *fromPath)
 		free(*it);
 	}
 	printf("Min: (%d|%d) Max: (%d|%d)\n", g_FromChunkX, g_FromChunkZ, g_ToChunkX, g_ToChunkZ);
+
+	// Init blocks
+	firstIf[WOOL] = true;
+	firstIf[LOG] = true;
+	firstIf[LEAVES] = true;
+	firstIf[STEP] = true;
+	firstIf[DOUBLESTEP] = true;
+	firstIf[WOOD] = true;
+	firstIf[WOODEN_STEP] = true;
+	firstIf[WOODEN_DOUBLE_STEP] = true;
+	firstIf[95] = true;
+	firstIf[160] = true;
+	firstIf[159] = true;
+	firstIf[171] = true;
+	firstIf[38] = true;
+	firstIf[175] = true;
+	firstIf[SAND] = true;
+	firstIf[153] = true;
+	for (int i = 176; i < 198; i++) {
+		firstIf[i] = true;
+	}
+	for (int i = 166; i < 169; i++) {
+		firstIf[i] = true;
+	}
+	firstIf[STONE] = true;
+	firstIf[141] = true;
+	firstIf[142] = true;
+	firstIf[158] = true;
+	firstIf[149] = true;
+	firstIf[157] = true;
+	firstIf[140] = true;
+	firstIf[144] = true;
+	firstIf[131] = true;
+	firstIf[132] = true;
+	firstIf[150] = true;
+	firstIf[147] = true;
+	firstIf[148] = true;
+	firstIf[68] = true;
+	firstIf[69] = true;
+	firstIf[70] = true;
+	firstIf[72] = true;
+	firstIf[77] = true;
+	firstIf[143] = true;
+	firstIf[36] = true;
+
 	return true;
 }
 
@@ -1030,12 +1077,7 @@ static void loadBiomeChunk(const char* path, const int chunkX, const int chunkZ)
 
 static inline void assignBlock(const uint8_t &block, uint8_t* &targetBlock, int &x, int &y, int &z, uint8_t* &justData)
 {
-	if (block == WOOL || block == LOG || block == LEAVES || block == STEP || block == DOUBLESTEP || block == WOOD || block == WOODEN_STEP || block == WOODEN_DOUBLE_STEP 
-		|| block == 95 || block == 160 || block == 159 || block == 171 || block == 38 || block == 175 || block == SAND || block == 153 
-		|| (g_NoWater && (block == WATER || block == STAT_WATER)) || (block >= 176 && block <= 197) || (block >= 166 && block <= 169) || block == STONE
-		|| block == 141 || block == 142 || block == 158 || block == 149 || block == 157 || block == 140 || block == 144
-		|| block == 131 || block == 132 || block == 150 || block == 147 || block == 148 || block == 68 || block == 69 || block == 70
-		|| block == 72 || block == 77 || block == 143 || block == 36) {  //three last lines contains colors for carpets
+	if (firstIf[block] || (g_NoWater && (block == WATER || block == STAT_WATER))) {  //three last lines contains colors for carpets
 		uint8_t col;
 		if (g_WorldFormat == 2) {
 			col = (justData[(x + (z + (y * CHUNKSIZE_Z)) * CHUNKSIZE_X) / 2] >> ((x % 2) * 4)) & 0xF;
